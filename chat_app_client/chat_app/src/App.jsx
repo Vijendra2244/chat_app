@@ -1,35 +1,63 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+// Update App.js to include Login and handle login events
+
+import React, { useState, useEffect } from "react";
+import io from "socket.io-client";
+import Sidebar from "./Sidebar";
+import Chat from "./Chat";
+import Login from "./Login";
+
+const socket = io("http://localhost:8080/", { transports: ["websocket"] });
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [users, setUsers] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [loggedInUser, setLoggedInUser] = useState(null);
+
+  useEffect(() => {
+    // Fetch users or user list from backend
+    socket.on("updateUserList", (users) => {
+      setUsers(users);
+    });
+
+    socket.on("userLoggedIn", ({ userId, username }) => {
+      setUsers((prevUsers) => [...prevUsers, { userId, username }]);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
+  const handleUserSelect = (user) => {
+    setSelectedUser(user);
+  };
+
+  const handleSendMessage = (message) => {
+    socket.emit("message", { receiverId: selectedUser.userId, message });
+  };
+
+  const handleLogin = (user) => {
+    setLoggedInUser(user);
+    socket.emit("join", user.username);
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div className="app">
+      {!loggedInUser ? (
+        <Login onLogin={handleLogin} />
+      ) : (
+        <>
+          <Sidebar users={users} onUserSelect={handleUserSelect} />
+          {selectedUser && (
+            <Chat
+              selectedUser={selectedUser}
+              onMessageSend={handleSendMessage}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
-export default App
+export default App;
